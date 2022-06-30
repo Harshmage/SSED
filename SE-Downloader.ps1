@@ -19,31 +19,46 @@ Runs if flag set
 Parameters:
     -SEGame <designation> (four character game designation on silverlock.org)
     -RunGame (bool, default false)
+    -dlkeep (bool, default false)
+    -nexusPAPI (string, generated from https://www.nexusmods.com/users/myaccount?tab=api+access)
 
 Usage:
     se-downloader.ps1 -SEGame F4SE -RunGame
         Checks game for Fallout 4 Script Extender, and launches the game when completed
     se-downloader.ps1 -SEGame SKSE64
         Checks game for Skyrim Special Edition Script Extender
+    se-downloader.ps1 -SEGame F76SFE -dlkeep -nexusPAPI "NexusMods Personal API Key"
+        Checks game for Fallout 76 SFE, an overlay DLL for Text Chat, requires NexusMods API Key, and does not delete the extracted download
 
 #>
 
 param(
     [Parameter(Mandatory)]
-    [ValidateSet("FOSE","NVSE","F4SE","OBSE","SKSE","SKSE64")]
+    [ValidateSet("FOSE","NVSE","F4SE","F76SFE","OBSE","SKSE","SKSE64")]
     [string]$SEGame,
 
     [Parameter()]
-    [switch]$RunGame = $false
+    [switch]$RunGame = $false,
+
+    [Parameter()]
+    [switch]$dlkeep = $false,
+
+    [Parameter()]
+    [string]$nexusPAPI # NexusMods Personal API Key (https://www.nexusmods.com/users/myaccount?tab=api+access)
 )
 
 <# # For Debug
-$SEGame = "NVSE"
-$RunGame = $false #>
+$SEGame = "F76SFE"
+$RunGame = $false 
+$nexusPAPI = "" #>
 
 # Set some variables
 $url = "https://$($SEGame).silverlock.org/"
 $rtype = "beta" # Release Type, Beta or Download
+$nexusHeaders = @{
+    "Accept"="application/json"
+    "apikey"="$nexusPAPI"
+}
 If ($SEGame -eq "SKSE64") { 
     $url = "https://skse.silverlock.org/"
     $GameName = "Skyrim Special Edition"
@@ -53,6 +68,26 @@ If ($SEGame -eq "SKSE64") {
     $GameName = "Oblivion"
 } ElseIf ($SEGame -eq "F4SE") {
     $GameName = "Fallout4"
+} ElseIf ($SEGame -eq "F76SFE") {
+    If ($nexusPAPI = "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
+    $GameName = "Fallout76"
+    $gamepath = get-childitem -recurse HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall | get-itemproperty | Where-Object { $_  -match $GameName } | Select-object -expandproperty InstallLocation
+    $WebResponse = Invoke-WebRequest "https://api.nexusmods.com/v1/games/fallout76/mods/287/files.json" -Headers $nexusHeaders
+    $json = $WebResponse.Content | ConvertFrom-Json
+    $dlver = [System.Version]::Parse("0.$($json.files.version[-1])")
+    $latestfileid = $json.files.id[-2] # Comes in pairs, first is the actual file ID, second is the game ID, this selects the second-to-last ID
+    $file = $json.files.file_name[-1]
+    $dlResponse = (Invoke-WebRequest "https://api.nexusmods.com/v1/games/fallout76/mods/287/files/$latestfileid/download_link.json" -Headers $nexusHeaders).Content | ConvertFrom-Json
+    $dlurl = $dlResponse.URI[0]
+    If (Test-Path "$gamepath\dxgi.dll") {
+        $currentSE = (Get-Item "$gamepath\dxgi.dll").VersionInfo.FileVersion # 0, 0, 6, 20
+        If ($currentSE -is [System.Array]) { $currentSE = $currentSE[0] }
+        $currentSE = [System.Version]::Parse($currentSE.Replace(', ','.'))
+    } Else {
+        $currentSE = [System.Version]::Parse("0.0.0.0") # Means you don't have it
+    }
+    $subfolder = ($file).Replace('.7z','')
+    $useSubfolder = $true
 } ElseIf ($SEGame -eq "NVSE") {
     #$url = "http://$($SEGame).silverlock.org/"
     #$SEGame = "NVSE"
@@ -64,7 +99,7 @@ If ($SEGame -eq "SKSE64") {
     $urlstrip = "https://github.com/x$($SEGame)/$($SEGame)/releases/download/"
     $WebResponse = Invoke-WebRequest $url -Headers @{"Accept"="application/json"}
     $json = $WebResponse.Content | ConvertFrom-Json
-    $dlver = "0." + $json.tag_name[0] # 0. + 5.1.6 = 0.5.1.6
+    $dlver = [System.Version]::Parse("0." + $json.tag_name[0]) # 0. + 5.1.6 = 0.5.1.6
     $dlurl = $json.assets.browser_download_url[0] # https://github.com/xNVSE/NVSE/releases/download/5.1.6/nvse_5_1_beta6.7z
     $file = $dlurl.Replace($urlstrip + $json.tag_name[0] + "/","") # nvse_5_1_beta6.7z
     $subfolder = ($file).Replace('.7z','') # nvse_5_1_beta6
@@ -72,7 +107,7 @@ If ($SEGame -eq "SKSE64") {
 } ElseIf ($SEGame -eq "FOSE") {
     $GameName = "Fallout3"
 }
-$gamepath = Get-ItemPropertyValue -Path "HKLM:\SOFTWARE\WOW6432Node\Bethesda Softworks\$GameName" -Name "installed path"
+If ($null -eq $gamepath) { $gamepath = Get-ItemPropertyValue -Path "HKLM:\SOFTWARE\WOW6432Node\Bethesda Softworks\$GameName" -Name "installed path" }
 
 function Write-Log 
 { 
@@ -141,7 +176,7 @@ If (!(Test-Path ${env:ProgramFiles}\7-Zip\7z.exe)) {
     Write-Log -Message "7-Zip x64 Path Not Found!" -Level Error 
     Exit
 }
-If ($SEGame -ne "NVSE") {
+If (($SEGame -ne "NVSE") -and ($SEGame -ne "F76SFE")) {
     # Get the latest F4SE 7-Zip file
     Try { 
         $WebResponse = Invoke-WebRequest $url
@@ -168,17 +203,19 @@ If ($SEGame -ne "NVSE") {
     } ElseIf ($dlver -notlike "*.*.*.*") {
         $dlver = $dlver.Insert(3,'.') # 0.0.6.20
     }
+    $dlver = [System.Version]::Parse($dlver)
 }
-#$dlver = [System.Version]::Parse($dlver.Insert(3,'.')) # 0.0.6.20
-$dlver = [System.Version]::Parse($dlver)
+
 
 # Get current install version
 Try { 
-    $currentSE = Get-Item "$gamepath\$($SEGame.ToLower())_*.dll" -Exclude "$($SEGame)_steam_loader.dll","$($SEGame.ToLower())_editor*.dll" # f4se_1_10_163.dll
-    $currentSE = (Get-Item $currentSE).VersionInfo.FileVersion # 0, 0, 6, 20
-    If ($currentSE -is [System.Array]) { $currentSE = $currentSE[0] }
-    $currentSE = $currentSE.Replace(', ','.') # 0.0.6.20
-    $currentSE = [System.Version]::Parse($currentSE)
+    If ($null -eq $currentSE) {
+        $currentSE = Get-Item "$gamepath\$($SEGame.ToLower())_*.dll" -Exclude "$($SEGame)_steam_loader.dll","$($SEGame.ToLower())_editor*.dll" # f4se_1_10_163.dll
+        $currentSE = (Get-Item $currentSE).VersionInfo.FileVersion # 0, 0, 6, 20
+        If ($currentSE -is [System.Array]) { $currentSE = $currentSE[0] }
+        $currentSE = $currentSE.Replace(', ','.') # 0.0.6.20
+        $currentSE = [System.Version]::Parse($currentSE)
+    }
 } Catch {
     $currentSE = [System.Version]::Parse("0.0.0.0") # Means you don't have it
 }
@@ -193,7 +230,7 @@ If ($dlver -gt $currentSE) {
     # Extract F4SE to the Fallout 4 folder (f4path\f4se_x_xx_xx)
     Write-Log -Message "Extracting Source $($SEGame) files ($($file) to $($gamepath))" -Level Info
     If ($useSubfolder) {
-        & ${env:ProgramFiles}\7-Zip\7z.exe x $env:USERPROFILE\Downloads\$file "-o$($gamepath + "\" + $subfolder)" -y # The Silverlock files have a subdir in the 7z file, the Github do not. Use this flag to create that subdir structure.
+        & ${env:ProgramFiles}\7-Zip\7z.exe x $env:USERPROFILE\Downloads\$file "-o$($gamepath + "\" + $subfolder)" -y # The Silverlock files have a subdir in the 7z file, the Github/Nexus files do not. Use this flag to create that subdir structure.
     } Else {
         & ${env:ProgramFiles}\7-Zip\7z.exe x $env:USERPROFILE\Downloads\$file "-o$($gamepath)" -y
     }
@@ -202,11 +239,16 @@ If ($dlver -gt $currentSE) {
     Copy-Item "$gamepath\$subfolder\*" -Exclude *.txt -Destination $gamepath -Force
     # Cleanup
     Write-Log -Message "Cleaning up extracted files from $($gamepath)\$($subfolder)" -Level Info
-    Remove-Item -Path $gamepath\$subfolder -Recurse -Force
+    If ($dlkeep -eq $false) { Remove-Item -Path $gamepath\$subfolder -Recurse -Force }
 } Else {
     Write-Log -Message "Source version ($dlver) is NOT higher than Local version ($currentSE), no action taken" -Level Info
 }
 If ($RunGame) {
-    Write-Log -Message "RunGame flag True, running $($SEGame)_loader.exe" -Level Info
-    Start-Process -FilePath "$gamepath\$($SEGame)_loader.exe" -WorkingDirectory $gamepath -PassThru
+    If ($SEGame -eq "F76SFE") {
+        Write-Log -Message "RunGame flag True, running Fallout76.exe" -Level Info
+        Start-Process -FilePath "$gamepath\Fallout76.exe" -WorkingDirectory $gamepath -PassThru
+    } Else {
+        Write-Log -Message "RunGame flag True, running $($SEGame)_loader.exe" -Level Info
+        Start-Process -FilePath "$gamepath\$($SEGame)_loader.exe" -WorkingDirectory $gamepath -PassThru
+    }
 }
