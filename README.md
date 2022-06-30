@@ -5,25 +5,31 @@ Currently supports:
 - Fallout 3
 - Fallout: New Vegas
 - Fallout 4
+- Fallout 76 SFE
 - Skyrim Special Edition
     
 To Do:
 - [ ] Skyrim - Plain Jane Elder Scrolls 5: Skyrim.  Should work, but I've not tested it
 - [ ] Oblivion - The page and file format are radically different from the others, and has not been updated since 2013, so I'll get to it eventually.
-    
-Checks matching Silverlock SE page for latest file version against locally installed
-Updates if available
-Runs if flag set
+
+Purpose:
+- Checks for latest file version against locally installed
+- Updates if available
+- Runs if flag set
 
 Parameters:
 - `-SEGame <designation>` (four character game designation on silverlock.org)
 - `-RunGame` (bool, default false)
+- `-dlkeep` (bool, default false)
+- `-nexusPAPI` (string, generated from https://www.nexusmods.com/users/myaccount?tab=api+access)
 
 Usage:
 - `se-downloader.ps1 -SEGame F4SE -RunGame`
   - Checks game for Fallout 4 Script Extender, and launches the game when completed
 - `se-downloader.ps1 -SEGame SKSE64`
   - Checks game for Skyrim Special Edition Script Extender
+- `se-downloader.ps1 -SEGame F76SFE -dlkeep -nexusPAPI "NexusMods Personal API Key"`
+  - Checks game for Fallout 76 SFE, an overlay DLL for Text Chat, requires NexusMods API Key, and does not delete the extracted download
 
 For Vortex users, add a new tool to your managed game (you'll have to do this for each game)
 - Target: `powershell.exe`
