@@ -1,3 +1,5 @@
+![SSED Logo](SSED-Logo.png)
+
 Powershell scripting that downloads and extracts the Silverlock Script Extenders for most Bethesda Gamebryo/Creation Engine games.
 
 The Silverlock Team builds script extensions for Bethesda games, expanding the modding capability said games.
