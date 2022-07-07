@@ -25,7 +25,7 @@ Parameters:
 - `-RunGame` (bool, default false)
 - `-dlkeep` (bool, default false)
 - `-hardpath` (string, file path to game folder)
-- `-nexusPAPI` (string, generated from https://www.nexusmods.com/users/myaccount?tab=api)
+- `-nexusAPI` (string, generated from https://www.nexusmods.com/users/myaccount?tab=api)
 
 Usage:
 - `se-downloader.ps1 -SEGame F4SE -RunGame`
@@ -34,7 +34,7 @@ Usage:
   - Checks game for Fallout 3 with a direct install path
 - `se-downloader.ps1 -SEGame SKSE64`
   - Checks game for Skyrim Special Edition Script Extender
-- `se-downloader.ps1 -SEGame F76SFE -dlkeep -nexusPAPI "NexusMods Personal API Key"`
+- `se-downloader.ps1 -SEGame F76SFE -dlkeep -nexusAPI "NexusMods Personal API Key"`
   - Checks game for Fallout 76 SFE, an overlay DLL for Text Chat, requires NexusMods API Key, and does not delete the extracted download
 
 For Vortex users, add a new tool to your managed game (you'll have to do this for each game)
