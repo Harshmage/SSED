@@ -1,15 +1,18 @@
+![SSED Logo](SSED-Logo.png)
+
 Powershell scripting that downloads and extracts the Silverlock Script Extenders for most Bethesda Gamebryo/Creation Engine games.
 
 The Silverlock Team builds script extensions for Bethesda games, expanding the modding capability said games.
 Currently supports:
-- Fallout 3
-- Fallout: New Vegas
-- Fallout 4
-- Fallout 76 SFE
-- Skyrim Special Edition
+- Fallout 3 (https://fose.silverlock.org/)
+- Fallout: New Vegas (https://github.com/xNVSE/NVSE)
+- Fallout 4 (https://f4se.silverlock.org/, https://github.com/ianpatt/f4se)
+- Fallout 76 SFE (https://www.nexusmods.com/fallout76/mods/287)
+- Skyrim Special/Anniversary Edition (https://skse.silverlock.org/, https://github.com/ianpatt/skse64)
     
 To Do:
 - [ ] Skyrim - Plain Jane Elder Scrolls 5: Skyrim.  Should work, but I've not tested it
+- [ ] Skyrim VR - Do I buy it to verify? Really, all I need in the registry information for the Uninstall, make an issue here with the info for me!
 - [ ] Oblivion - The page and file format are radically different from the others, and has not been updated since 2013, so I'll get to it eventually.
 
 Purpose:
@@ -21,11 +24,14 @@ Parameters:
 - `-SEGame <designation>` (four character game designation on silverlock.org)
 - `-RunGame` (bool, default false)
 - `-dlkeep` (bool, default false)
-- `-nexusPAPI` (string, generated from https://www.nexusmods.com/users/myaccount?tab=api+access)
+- `-hardpath` (string, file path to game folder)
+- `-nexusPAPI` (string, generated from https://www.nexusmods.com/users/myaccount?tab=api)
 
 Usage:
 - `se-downloader.ps1 -SEGame F4SE -RunGame`
   - Checks game for Fallout 4 Script Extender, and launches the game when completed
+  - `se-downloader.ps1 -SEGame FOSE -hardpath "G:\FO3GOTY"`
+  - Checks game for Fallout 3 with a direct install path
 - `se-downloader.ps1 -SEGame SKSE64`
   - Checks game for Skyrim Special Edition Script Extender
 - `se-downloader.ps1 -SEGame F76SFE -dlkeep -nexusPAPI "NexusMods Personal API Key"`
