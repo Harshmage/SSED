@@ -128,7 +128,7 @@ If ($SEGame -eq "SKSE64") {
     $subfolder = ($dl.file).Replace('.7z','')
     $useSubfolder = $true
 } ElseIf ($SEGame -eq "NVSE") {
-    $GameName = "falloutnv"
+    $GameName = "Fallout New Vegas"
     # NVSE went to a community Github in May 2020
     # https://github.com/xNVSE/NVSE
     $url = "https://api.github.com/repos/x$($SEGame)/$($SEGame)/releases"
@@ -149,15 +149,16 @@ If ($SEGame -eq "SKSE64") {
 }
 
 # Get the Install Path from the uninstall registry
-Try {
-    If (($hardpath.Length -gt 4) -and (Test-path $hardpath)) {
-        $gamepath = $hardpath
-    } Else {
+If (($hardpath.Length -gt 4) -and (Test-path $hardpath)) {
+    $gamepath = $hardpath
+} Else {
+    Try {
         $gamepath = get-childitem -recurse HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall | get-itemproperty | Where-Object { $_  -match $GameName } | Select-object -expandproperty InstallLocation
+        Test-path $gamepath
+    } Catch {
+        Write-Error -Message "Unable to find installation directory for $GameName"
+        break
     }
-} Catch {
-    Write-Error -Message "Unable to find installation directory for $GameName"
-    break
 }
 function Write-Log 
 { 
