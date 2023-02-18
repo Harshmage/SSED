@@ -6,6 +6,7 @@ Currently supports:
     Fallout 3
     Fallout: New Vegas
     Fallout 4
+	Fallout 76 (only the SFE tool for Text Chat and Perk Loader mods)
     Skyrim Special/Anniversary Edition
 
 Nexusmods API Reference: https://app.swaggerhub.com/apis-docs/NexusMods/nexus-mods_public_api_params_in_form_data/1.0#/
@@ -20,7 +21,7 @@ Parameters:
     -RunGame (bool, default false)
     -dlkeep (bool, default false)
     -hardpath (string, file path to game folder)
-    -nexusPAPI (string, generated from https://www.nexusmods.com/users/myaccount?tab=api)
+    -nexusAPI (string, generated from https://www.nexusmods.com/users/myaccount?tab=api)
 
 Usage:
     se-downloader.ps1 -SEGame F4SE -RunGame
@@ -29,7 +30,7 @@ Usage:
         Checks game for Fallout 3 with a direct install path
     se-downloader.ps1 -SEGame SKSE64
         Checks game for Skyrim Special Edition Script Extender
-    se-downloader.ps1 -SEGame F76SFE -dlkeep -nexusPAPI "NexusMods Personal API Key"
+    se-downloader.ps1 -SEGame F76SFE -dlkeep -nexusAPI "NexusMods API Key"
         Checks game for Fallout 76 SFE, an overlay DLL for Text Chat, requires NexusMods API Key, and does not delete the extracted download
 
 #>
@@ -56,110 +57,23 @@ param(
 $SEGame = "FOSE"
 $RunGame = $false 
 #$dlkeep = $true
-$nexusPAPI = "" #>
+$nexusAPI = "" #>
 
-# Set some variables
-$url = "https://$($SEGame).silverlock.org/"
-$rtype = "beta" # Release Type, Beta or Download
-$nexusHeaders = @{
-    "Accept"="application/json"
-    "apikey"="$nexusAPI"
-}
-If ($SEGame -eq "SKSE64") { 
-    $GameName = "Skyrim Special Edition"
-    $url = "https://api.github.com/repos/ianpatt/$($SEGame)/releases"
-    $WebResponse = Invoke-WebRequest $url -Headers @{"Accept"="application/json"}
-    $json = $WebResponse.Content | ConvertFrom-Json
-    $json = $json[0]
-    $dl = [PSCustomObject]@{
-        ver = [System.Version]::Parse("0." + ($json.tag_name).Replace("v","")) # 0. + 5.1.6 = 0.5.1.6
-        url = $json.assets.browser_download_url # https://github.com/xNVSE/NVSE/releases/download/5.1.6/nvse_5_1_beta6.7z
-        file = $json.assets.name # nvse_5_1_beta6.7z
-    }
-    $subfolder = ($dl.file).Replace('.7z','') # f4se_0_06_20
-} ElseIf ($SEGame -eq "SKSEVR") {
-    $GameName = "Skyrim VR"
-} ElseIf ($SEGame -eq "SKSE") {
-    $GameName = "Skyrim"
-    $url = "https://api.github.com/repos/ianpatt/$($SEGame)/releases"
-    $WebResponse = Invoke-WebRequest $url -Headers @{"Accept"="application/json"}
-    $json = $WebResponse.Content | ConvertFrom-Json
-    $json = $json[0]
-    $dl = [PSCustomObject]@{
-        ver = [System.Version]::Parse("0." + ($json.tag_name).Replace("v","")) # 0. + 5.1.6 = 0.5.1.6
-        url = $json.assets.browser_download_url # https://github.com/xNVSE/NVSE/releases/download/5.1.6/nvse_5_1_beta6.7z
-        file = $json.assets.name # nvse_5_1_beta6.7z
-    }
-    $subfolder = ($dl.file).Replace('.7z','') # f4se_0_06_20
-} ElseIf ($SEGame -eq "OBSE") {
-    $GameName = "Oblivion"
-} ElseIf ($SEGame -eq "F4SE") {
-    $GameName = "Fallout4"
-    $url = "https://api.github.com/repos/ianpatt/$($SEGame)/releases"
-    $WebResponse = Invoke-WebRequest $url -Headers @{"Accept"="application/json"}
-    $json = $WebResponse.Content | ConvertFrom-Json
-    $json = $json[0]
-    $dl = [PSCustomObject]@{
-        ver = [System.Version]::Parse("0." + ($json.tag_name).Replace("v","")) # 0. + 5.1.6 = 0.5.1.6
-        url = $json.assets.browser_download_url # https://github.com/xNVSE/NVSE/releases/download/5.1.6/nvse_5_1_beta6.7z
-        file = $json.assets.name # nvse_5_1_beta6.7z
-    }
-    $subfolder = ($dl.file).Replace('.7z','') # f4se_0_06_20
-} ElseIf ($SEGame -eq "F76SFE") {
-    If ($nexusPAPI = "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
-    $GameName = "Fallout76"
-    $url = "https://api.nexusmods.com"
-    $WebResponse = (Invoke-WebRequest "https://api.nexusmods.com/v1/games/fallout76/mods/287/files.json" -Headers $nexusHeaders).Content | ConvertFrom-Json | Select-Object -Property @{L='files';E={$_.files[-1]}}
-    $json = $WebResponse.files
-    $latestfileid = $json.id[0]
-    $dlResponse = (Invoke-WebRequest "https://api.nexusmods.com/v1/games/fallout76/mods/287/files/$latestfileid/download_link.json" -Headers $nexusHeaders).Content | ConvertFrom-Json | Select-Object -Property @{L='URI';E={$_.URI[0]}}
-    $dl = [PSCustomObject]@{
-        ver = [System.Version]::Parse("0.$($json.version)")
-        url = $dlResponse.URI
-        file = $json.file_name
-    }
-    If (Test-Path "$gamepath\dxgi.dll") {
-        $currentSE = (Get-Item "$gamepath\dxgi.dll").VersionInfo.FileVersion # 0, 0, 6, 20
-        If ($currentSE -is [System.Array]) { $currentSE = $currentSE[0] }
-        $currentSE = [System.Version]::Parse($currentSE.Replace(', ','.'))
-    } Else {
-        $currentSE = [System.Version]::Parse("0.0.0.0") # Means you don't have it
-    }
-    $subfolder = ($dl.file).Replace('.7z','')
-    $useSubfolder = $true
-} ElseIf ($SEGame -eq "NVSE") {
-    $GameName = "Fallout New Vegas"
-    # NVSE went to a community Github in May 2020
-    # https://github.com/xNVSE/NVSE
-    $url = "https://api.github.com/repos/x$($SEGame)/$($SEGame)/releases"
-    $WebResponse = Invoke-WebRequest $url -Headers @{"Accept"="application/json"}
-    $json = $WebResponse.Content | ConvertFrom-Json
-    $json = $json[0]
-    $dl = [PSCustomObject]@{
-        ver = [System.Version]::Parse("0." + $json.tag_name)
-        url = $json.assets.browser_download_url
-        file = $json.assets.name
-    }
-    $subfolder = ($dl.file).Replace('.7z','') # nvse_5_1_beta6
-    $useSubfolder = $true
-} ElseIf ($SEGame -eq "FOSE") {
-    $GameName = "Fallout 3"
-    $subfolder = ($dl.file).Replace('.7z','') # nvse_5_1_beta6
-    $useSubfolder = $true
+Function Get-GamePath {
+	# Get the Install Path from the uninstall registry
+	If (($hardpath.Length -gt 4) -and (Test-path $hardpath)) {
+		$global:gamepath = $hardpath
+	} Else {
+		Try {
+			$global:gamepath = get-childitem -recurse HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall | get-itemproperty | Where-Object { $_  -match $GameName } | Select-object -expandproperty InstallLocation
+			Test-path $gamepath
+		} Catch {
+			Write-Error -Message "Unable to find installation directory for $GameName"
+			break
+		}
+	}
 }
 
-# Get the Install Path from the uninstall registry
-If (($hardpath.Length -gt 4) -and (Test-path $hardpath)) {
-    $gamepath = $hardpath
-} Else {
-    Try {
-        $gamepath = get-childitem -recurse HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall | get-itemproperty | Where-Object { $_  -match $GameName } | Select-object -expandproperty InstallLocation
-        Test-path $gamepath
-    } Catch {
-        Write-Error -Message "Unable to find installation directory for $GameName"
-        break
-    }
-}
 function Write-Log 
 { 
     [CmdletBinding()] 
@@ -218,9 +132,103 @@ function Write-Log
             } 
         # Write log entry to $Path 
         "$FormattedDate $LevelText $Message" | Out-File -FilePath $Path -Append 
-    } End { 
-    } 
+    }
 }
+
+# Set some variables
+$url = "https://$($SEGame).silverlock.org/"
+$rtype = "beta" # Release Type, Beta or Download
+$nexusHeaders = @{
+    "Accept"="application/json"
+    "apikey"="$nexusAPI"
+}
+
+# Build the primary game and DLL variables
+If ($SEGame -eq "SKSE64") { 
+    $GameName = "Skyrim Special Edition"
+    $url = "https://api.github.com/repos/ianpatt/$($SEGame)/releases"
+    $WebResponse = Invoke-WebRequest $url -Headers @{"Accept"="application/json"}
+    $json = $WebResponse.Content | ConvertFrom-Json
+    $json = $json[0]
+    $dl = [PSCustomObject]@{
+        ver = [System.Version]::Parse("0." + ($json.tag_name).Replace("v","")) # 0. + 5.1.6 = 0.5.1.6
+        url = $json.assets.browser_download_url # https://github.com/xNVSE/NVSE/releases/download/5.1.6/nvse_5_1_beta6.7z
+        file = $json.assets.name # nvse_5_1_beta6.7z
+    }
+    $subfolder = ($dl.file).Replace('.7z','') # f4se_0_06_20
+} ElseIf ($SEGame -eq "SKSEVR") {
+    $GameName = "Skyrim VR"
+} ElseIf ($SEGame -eq "SKSE") {
+    $GameName = "Skyrim"
+    $url = "https://api.github.com/repos/ianpatt/$($SEGame)/releases"
+    $WebResponse = Invoke-WebRequest $url -Headers @{"Accept"="application/json"}
+    $json = $WebResponse.Content | ConvertFrom-Json
+    $json = $json[0]
+    $dl = [PSCustomObject]@{
+        ver = [System.Version]::Parse("0." + ($json.tag_name).Replace("v","")) # 0. + 5.1.6 = 0.5.1.6
+        url = $json.assets.browser_download_url # https://github.com/xNVSE/NVSE/releases/download/5.1.6/nvse_5_1_beta6.7z
+        file = $json.assets.name # nvse_5_1_beta6.7z
+    }
+    $subfolder = ($dl.file).Replace('.7z','') # f4se_0_06_20
+} ElseIf ($SEGame -eq "OBSE") {
+    $GameName = "Oblivion"
+} ElseIf ($SEGame -eq "F4SE") {
+    $GameName = "Fallout4"
+    $url = "https://api.github.com/repos/ianpatt/$($SEGame)/releases"
+    $WebResponse = Invoke-WebRequest $url -Headers @{"Accept"="application/json"}
+    $json = $WebResponse.Content | ConvertFrom-Json
+    $json = $json[0]
+    $dl = [PSCustomObject]@{
+        ver = [System.Version]::Parse("0." + ($json.tag_name).Replace("v","")) # 0. + 5.1.6 = 0.5.1.6
+        url = $json.assets.browser_download_url # https://github.com/xNVSE/NVSE/releases/download/5.1.6/nvse_5_1_beta6.7z
+        file = $json.assets.name # nvse_5_1_beta6.7z
+    }
+    $subfolder = ($dl.file).Replace('.7z','') # f4se_0_06_20
+} ElseIf ($SEGame -eq "F76SFE") {
+    If ($nexusAPI = "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
+    $GameName = "Fallout76"
+    $url = "https://api.nexusmods.com"
+    $WebResponse = (Invoke-WebRequest "https://api.nexusmods.com/v1/games/fallout76/mods/287/files.json" -Headers $nexusHeaders).Content | ConvertFrom-Json | Select-Object -Property @{L='files';E={$_.files[-1]}}
+    $json = $WebResponse.files
+    $latestfileid = $json.id[0]
+    $dlResponse = (Invoke-WebRequest "https://api.nexusmods.com/v1/games/fallout76/mods/287/files/$latestfileid/download_link.json" -Headers $nexusHeaders).Content | ConvertFrom-Json | Select-Object -Property @{L='URI';E={$_.URI[0]}}
+    $dl = [PSCustomObject]@{
+        ver = [System.Version]::Parse("0.$($json.version)")
+        url = $dlResponse.URI
+        file = $json.file_name
+    }
+	Get-GamePath
+    If (Test-Path "$gamepath\dxgi.dll") {
+        $currentSE = (Get-Item "$gamepath\dxgi.dll").VersionInfo.FileVersion # 0, 0, 6, 20
+        If ($currentSE -is [System.Array]) { $currentSE = $currentSE[0] }
+        $currentSE = [System.Version]::Parse($currentSE.Replace(', ','.'))
+    } Else {
+        $currentSE = [System.Version]::Parse("0.0.0.0") # Means you don't have it
+    }
+    $subfolder = ($dl.file).Replace('.7z','')
+    $useSubfolder = $true
+} ElseIf ($SEGame -eq "NVSE") {
+    $GameName = "Fallout New Vegas"
+    # NVSE went to a community Github in May 2020
+    # https://github.com/xNVSE/NVSE
+    $url = "https://api.github.com/repos/x$($SEGame)/$($SEGame)/releases"
+    $WebResponse = Invoke-WebRequest $url -Headers @{"Accept"="application/json"}
+    $json = $WebResponse.Content | ConvertFrom-Json
+    $json = $json[0]
+    $dl = [PSCustomObject]@{
+        ver = [System.Version]::Parse("0." + $json.tag_name)
+        url = $json.assets.browser_download_url
+        file = $json.assets.name
+    }
+    $subfolder = ($dl.file).Replace('.7z','') # nvse_5_1_beta6
+    $useSubfolder = $true
+} ElseIf ($SEGame -eq "FOSE") {
+    $GameName = "Fallout 3"
+    $subfolder = ($dl.file).Replace('.7z','') # nvse_5_1_beta6
+    $useSubfolder = $true
+} 
+
+If ($null -eq $gamepath) { Get-GamePath }
 
 # Test for 7-Zip x64 path, fail if not found
 If (!(Test-Path $env:ProgramFiles\7-Zip\7z.exe)) {
@@ -263,7 +271,6 @@ If ($url -match "silverlock.org") {
         file = $file
     }
 }
-
 
 # Get current install version
 Try { 
