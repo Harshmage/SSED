@@ -57,8 +57,8 @@ param(
 <#  # For Debug
 $SEGame = "FOSE"
 $RunGame = $false 
-#$dlkeep = $true
-$nexusAPI = "" #>
+#$dlkeep = $true #>
+$nexusAPI = 'ja+TUXr1LzF4PEFhBoMCEy9jlmslBaEMJWV/ULxwvUZxKQU=--8jOT7Q3skh8dTKlx--gGHkukW1n2zP5KNKyfhvWQ=='
 
 Function Get-GamePath {
 	# Get the Install Path from the uninstall registry
@@ -156,7 +156,7 @@ If ($SEGame -eq "SKSE64") {
     Get-GamePath
     $gog = ($gamepath -notmatch "steamapps") # Identify if not using Steam for the install path, assume its GOG, as the Epic Store install is officially unsupported
     $url = "https://api.github.com/repos/ianpatt/$($SEGame)/releases"
-    $WebResponse = Invoke-WebRequest $url -Headers @{"Accept"="application/json"}
+    $WebResponse = Invoke-WebRequest $url -Headers @{"Accept"="application/json"} -UseBasicParsing
     $json = $WebResponse.Content | ConvertFrom-Json
     $json = $json[0]
     $dl = [PSCustomObject]@{
@@ -166,25 +166,42 @@ If ($SEGame -eq "SKSE64") {
     }
     $subfolder = ($dl.file).Replace('.7z','') # f4se_0_06_20
 } ElseIf ($SEGame -eq "SKSEVR") {
+    # TODO
     $GameName = "Skyrim VR"
 } ElseIf ($SEGame -eq "SKSE") {
+    # TODO This section is for Skyrim Original Edition, however all of my releases are for SE, so this is not yet validated
+    If ($nexusAPI = "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
     $GameName = "Skyrim"
-    $url = "https://api.github.com/repos/ianpatt/$($SEGame)/releases"
-    $WebResponse = Invoke-WebRequest $url -Headers @{"Accept"="application/json"}
+    $nexusmodID = "100216"
+    $nexusgameID = "skyrim"
+    $url = "https://api.nexusmods.com"
+    $WebResponse = (Invoke-WebRequest "https://api.nexusmods.com/v1/games/$nexusgameID/mods/$nexusmodID/files.json" -Headers $nexusHeaders -UseBasicParsing).Content | ConvertFrom-Json | Select-Object -Property @{L='files';E={$_.files[0]}}
+    $json = $WebResponse.files
+    $latestfileid = $json.file_id[0]
+    $dlResponse = (Invoke-WebRequest "https://api.nexusmods.com/v1/games/$nexusgameID/mods/$nexusmodID/files/$latestfileid/download_link.json" -Headers $nexusHeaders).Content | ConvertFrom-Json | Select-Object -Property @{L='URI';E={$_.URI[0]}}
+    $dl = [PSCustomObject]@{
+        ver = [System.Version]::Parse("0.$($json.version)")
+        url = $dlResponse.URI
+        file = $json.file_name
+    }
+    $subfolder = ($dl.file).Replace('.7z','') # f4se_0_06_20
+} ElseIf ($SEGame -eq "OBSE") {
+    # TODO Need to validate
+    $GameName = "Oblivion"
+    $url = "https://api.github.com/repos/llde/xOBSE/releases"
+    $WebResponse = Invoke-WebRequest $url -Headers @{"Accept"="application/json"} -UseBasicParsing
     $json = $WebResponse.Content | ConvertFrom-Json
     $json = $json[0]
     $dl = [PSCustomObject]@{
-        ver = [System.Version]::Parse("0." + ($json.tag_name).Replace("v","")) # 0. + 5.1.6 = 0.5.1.6
+        ver = [System.Version]::Parse("0." + ($json.tag_name).Replace("v","") + ".0") # 0. + 5.1.6 = 0.5.1.6
         url = $json.assets.browser_download_url # https://github.com/xNVSE/NVSE/releases/download/5.1.6/nvse_5_1_beta6.7z
         file = $json.assets.name # nvse_5_1_beta6.7z
     }
     $subfolder = ($dl.file).Replace('.7z','') # f4se_0_06_20
-} ElseIf ($SEGame -eq "OBSE") {
-    $GameName = "Oblivion"
 } ElseIf ($SEGame -eq "F4SE") {
     $GameName = "Fallout4"
     $url = "https://api.github.com/repos/ianpatt/$($SEGame)/releases"
-    $WebResponse = Invoke-WebRequest $url -Headers @{"Accept"="application/json"}
+    $WebResponse = Invoke-WebRequest $url -Headers @{"Accept"="application/json"} -UseBasicParsing
     $json = $WebResponse.Content | ConvertFrom-Json
     $json = $json[0]
     $dl = [PSCustomObject]@{
