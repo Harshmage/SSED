@@ -9,11 +9,14 @@ Currently supports:
 - Fallout 4 (https://f4se.silverlock.org/, https://github.com/ianpatt/f4se)
 - Fallout 76 SFE (https://www.nexusmods.com/fallout76/mods/287)
 - Skyrim Special/Anniversary Edition (https://skse.silverlock.org/, https://github.com/ianpatt/skse64)
+- Skyrim Original Edition (https://www.nexusmods.com/skyrim/mods/100216)
+- Skyrim VR (https://www.nexusmods.com/skyrimspecialedition/mods/30457)
+- Oblivion (https://github.com/llde/xOBSE)
     
 To Do:
-- [ ] Skyrim - Plain Jane Elder Scrolls 5: Skyrim.  Should work, but I've not tested it
-- [ ] Skyrim VR - Do I buy it to verify? Really, all I need in the registry information for the Uninstall, make an issue here with the info for me!
-- [ ] Oblivion - The page and file format are radically different from the others, and has not been updated since 2013, so I'll get to it eventually.
+- [x] Skyrim - Plain Jane Elder Scrolls 5: Skyrim.  Should work, but I've not tested it
+- [x] Skyrim VR - Do I buy it to verify? Really, all I need in the registry information for the Uninstall, make an issue here with the info for me!
+- [x] Oblivion - The page and file format are radically different from the others, and has not been updated since 2013, so I'll get to it eventually.
 
 Purpose:
 - Checks for latest file version against locally installed
