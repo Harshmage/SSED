@@ -135,6 +135,13 @@ function Write-Log {
     }
 }
 
+# Test for 7-Zip x64 path, fail if not found
+If (!(Test-Path $env:ProgramFiles\7-Zip\7z.exe)) {
+    Write-Log -Message "7-Zip x64 Path Not Found!" -Level Error
+    Start-Process msedge -PassThru "https://www.7-zip.org/download.html"
+    Exit
+}
+
 # Set some variables
 $url = "https://$($SEGame).silverlock.org/"
 $rtype = "beta" # Release Type, Beta or Download
@@ -232,11 +239,6 @@ If ($SEGame -eq "SKSE64") {
 
 If ($null -eq $gamepath) { Get-GamePath }
 
-# Test for 7-Zip x64 path, fail if not found
-If (!(Test-Path $env:ProgramFiles\7-Zip\7z.exe)) {
-    Write-Log -Message "7-Zip x64 Path Not Found!" -Level Error 
-    Exit
-}
 #### If a silverlock.org url, use this section to build out version validation ####
 If ($url -match "silverlock.org") {
     # Get the latest 7-Zip file
