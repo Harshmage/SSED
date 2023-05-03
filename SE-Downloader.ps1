@@ -3,12 +3,15 @@ Silverlock Script Extender Downloader
 
 The Silverlock Team builds script extensions for Bethesda games, expanding the modding capability said games.
 Currently supports:
-    Fallout 3
-    Fallout: New Vegas
-    Fallout 4
-	Fallout 76 (only the SFE tool for Text Chat and Perk Loader mods)
-    Skyrim Special/Anniversary Edition
+    Fallout 3 (FOSE)
+    Fallout: New Vegas (NVSE)
+    Fallout 4 (F4SE)
+	Fallout 76 (only the SFE tool for Text Chat and Perk Loader mods) (F76SFE)
+    Skyrim Special/Anniversary Edition (SKSE64)
         GOG version needs validation
+    Skyrim Original Edition (No Longer Updated!) (SKSE)
+    Skyrim VR (SKSEVR)
+    Oblivion (OBSE)
 
 Nexusmods API Reference: https://app.swaggerhub.com/apis-docs/NexusMods/nexus-mods_public_api_params_in_form_data/1.0#/
 Nexusmods API AUP: https://help.nexusmods.com/article/114-api-acceptable-use-policy
@@ -57,8 +60,8 @@ param(
 <#  # For Debug
 $SEGame = "FOSE"
 $RunGame = $false 
-#$dlkeep = $true #>
-$nexusAPI = 'ja+TUXr1LzF4PEFhBoMCEy9jlmslBaEMJWV/ULxwvUZxKQU=--8jOT7Q3skh8dTKlx--gGHkukW1n2zP5KNKyfhvWQ=='
+#$dlkeep = $true
+$nexusAPI = Get-Content ..\nexus.api #>
 
 Function Get-GamePath {
 	# Get the Install Path from the uninstall registry
@@ -78,7 +81,7 @@ Function Get-GamePath {
 function Write-Log { 
     [CmdletBinding()] 
     Param ( 
-        [Parameter(Mandatory=$true, ValueFromPipelineByPropertyName=$true)] 
+        [Parameter(Mandatory=$true, ValueFromPipelineByPropertyName=$true)]
         [ValidateNotNullOrEmpty()] 
         [Alias("LogContent")] 
         [string]$Message, 
@@ -166,10 +169,24 @@ If ($SEGame -eq "SKSE64") {
     }
     $subfolder = ($dl.file).Replace('.7z','') # f4se_0_06_20
 } ElseIf ($SEGame -eq "SKSEVR") {
-    # TODO
+    # TODO Need to validate
+    If ($nexusAPI = "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
     $GameName = "Skyrim VR"
+    $nexusmodID = "30457"
+    $nexusgameID = "skyrimspecialedition"
+    $url = "https://api.nexusmods.com"
+    $WebResponse = (Invoke-WebRequest "https://api.nexusmods.com/v1/games/$nexusgameID/mods/$nexusmodID/files.json" -Headers $nexusHeaders -UseBasicParsing).Content | ConvertFrom-Json | Select-Object -Property @{L='files';E={$_.files[0]}}
+    $json = $WebResponse.files
+    $latestfileid = $json.file_id[0]
+    $dlResponse = (Invoke-WebRequest "https://api.nexusmods.com/v1/games/$nexusgameID/mods/$nexusmodID/files/$latestfileid/download_link.json" -Headers $nexusHeaders).Content | ConvertFrom-Json | Select-Object -Property @{L='URI';E={$_.URI[0]}}
+    $dl = [PSCustomObject]@{
+        ver = [System.Version]::Parse("0.$($json.version)")
+        url = $dlResponse.URI
+        file = $json.file_name
+    }
+    $subfolder = ($dl.file).Replace('.7z','') # f4se_0_06_20
 } ElseIf ($SEGame -eq "SKSE") {
-    # TODO This section is for Skyrim Original Edition, however all of my releases are for SE, so this is not yet validated
+    # TODO Need to validate
     If ($nexusAPI = "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
     $GameName = "Skyrim"
     $nexusmodID = "100216"
