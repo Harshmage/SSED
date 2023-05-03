@@ -12,6 +12,7 @@ Currently supports:
 - Skyrim Original Edition (https://www.nexusmods.com/skyrim/mods/100216)
 - Skyrim VR (https://www.nexusmods.com/skyrimspecialedition/mods/30457)
 - Oblivion (https://github.com/llde/xOBSE)
+- Morrowind (https://www.nexusmods.com/morrowind/mods/45468)
     
 To Do:
 - [x] Skyrim - Plain Jane Elder Scrolls 5: Skyrim.  Should work, but I've not tested it

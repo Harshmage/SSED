@@ -12,6 +12,7 @@ Currently supports:
     Skyrim Original Edition (No Longer Updated!) (SKSE)
     Skyrim VR (SKSEVR)
     Oblivion (OBSE)
+    Morrowind (MWSE)
 
 Nexusmods API Reference: https://app.swaggerhub.com/apis-docs/NexusMods/nexus-mods_public_api_params_in_form_data/1.0#/
 Nexusmods API AUP: https://help.nexusmods.com/article/114-api-acceptable-use-policy
@@ -41,7 +42,7 @@ Usage:
 
 param(
     [Parameter(Mandatory)]
-    [ValidateSet("FOSE","NVSE","F4SE","F76SFE","OBSE","SKSE","SKSE64","SKSEVR")]
+    [ValidateSet("FOSE","NVSE","F4SE","F76SFE","OBSE","SKSE","SKSE64","SKSEVR","MWSE")]
     [string]$SEGame,
 
     [Parameter()]
@@ -269,7 +270,24 @@ If ($SEGame -eq "SKSE64") {
     $GameName = "Fallout 3"
     $subfolder = ($dl.file).Replace('.7z','') # nvse_5_1_beta6
     $useSubfolder = $true
-} 
+} ElseIf ($SEGame -eq "MWSE") {
+    # TODO Need to validate
+    If ($nexusAPI = "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
+    $GameName = "Morrowind"
+    $nexusmodID = "45468"
+    $nexusgameID = "morrowind"
+    $url = "https://api.nexusmods.com"
+    $WebResponse = (Invoke-WebRequest "https://api.nexusmods.com/v1/games/$nexusgameID/mods/$nexusmodID/files.json" -Headers $nexusHeaders -UseBasicParsing).Content | ConvertFrom-Json | Select-Object -Property @{L='files';E={$_.files[-1]}}
+    $json = $WebResponse.files
+    $latestfileid = $json.file_id[0]
+    $dlResponse = (Invoke-WebRequest "https://api.nexusmods.com/v1/games/$nexusgameID/mods/$nexusmodID/files/$latestfileid/download_link.json" -Headers $nexusHeaders).Content | ConvertFrom-Json | Select-Object -Property @{L='URI';E={$_.URI[0]}}
+    $dl = [PSCustomObject]@{
+        ver = If ($json.version -contains ".") { [System.Version]::Parse("0.$($json.version)") } Else { $json.version }
+        url = $dlResponse.URI
+        file = $json.file_name
+    }
+    $subfolder = ($dl.file).Replace('.7z','') # f4se_0_06_20
+}
 
 If ($null -eq $gamepath) { Get-GamePath }
 
