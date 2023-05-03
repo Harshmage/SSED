@@ -8,6 +8,7 @@ Currently supports:
     Fallout 4
 	Fallout 76 (only the SFE tool for Text Chat and Perk Loader mods)
     Skyrim Special/Anniversary Edition
+        GOG version needs validation
 
 Nexusmods API Reference: https://app.swaggerhub.com/apis-docs/NexusMods/nexus-mods_public_api_params_in_form_data/1.0#/
 Nexusmods API AUP: https://help.nexusmods.com/article/114-api-acceptable-use-policy
@@ -74,8 +75,7 @@ Function Get-GamePath {
 	}
 }
 
-function Write-Log 
-{ 
+function Write-Log { 
     [CmdletBinding()] 
     Param ( 
         [Parameter(Mandatory=$true, ValueFromPipelineByPropertyName=$true)] 
@@ -146,14 +146,16 @@ $nexusHeaders = @{
 # Build the primary game and DLL variables
 If ($SEGame -eq "SKSE64") { 
     $GameName = "Skyrim Special Edition"
+    Get-GamePath
+    $gog = ($gamepath -notmatch "steamapps") # Identify if not using Steam for the install path, assume its GOG, as the Epic Store install is officially unsupported
     $url = "https://api.github.com/repos/ianpatt/$($SEGame)/releases"
     $WebResponse = Invoke-WebRequest $url -Headers @{"Accept"="application/json"}
     $json = $WebResponse.Content | ConvertFrom-Json
     $json = $json[0]
     $dl = [PSCustomObject]@{
         ver = [System.Version]::Parse("0." + ($json.tag_name).Replace("v","")) # 0. + 5.1.6 = 0.5.1.6
-        url = $json.assets.browser_download_url # https://github.com/xNVSE/NVSE/releases/download/5.1.6/nvse_5_1_beta6.7z
-        file = $json.assets.name # nvse_5_1_beta6.7z
+        url = If ($gog) { $json.assets.browser_download_url | Where-Object { $_ -match "gog" } } Else { $json.assets.browser_download_url | Where-Object { $_ -notmatch "gog" } } # https://github.com/xNVSE/NVSE/releases/download/5.1.6/nvse_5_1_beta6.7z
+        file = If ($gog) { $json.assets.name | Where-Object { $_ -match "gog" } } Else { $json.assets.name | Where-Object { $_ -notmatch "gog" } } # nvse_5_1_beta6.7z
     }
     $subfolder = ($dl.file).Replace('.7z','') # f4se_0_06_20
 } ElseIf ($SEGame -eq "SKSEVR") {
@@ -235,7 +237,7 @@ If (!(Test-Path $env:ProgramFiles\7-Zip\7z.exe)) {
     Write-Log -Message "7-Zip x64 Path Not Found!" -Level Error 
     Exit
 }
-#### If a silverlock.org url, use this section ####
+#### If a silverlock.org url, use this section to build out version validation ####
 If ($url -match "silverlock.org") {
     # Get the latest 7-Zip file
     Try { 
