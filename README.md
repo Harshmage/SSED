@@ -13,11 +13,7 @@ Currently supports:
 - Skyrim VR (https://www.nexusmods.com/skyrimspecialedition/mods/30457)
 - Oblivion (https://github.com/llde/xOBSE)
 - Morrowind (https://www.nexusmods.com/morrowind/mods/45468)
-    
-To Do:
-- [x] Skyrim - Plain Jane Elder Scrolls 5: Skyrim.  Should work, but I've not tested it
-- [x] Skyrim VR - Do I buy it to verify? Really, all I need in the registry information for the Uninstall, make an issue here with the info for me!
-- [x] Oblivion - The page and file format are radically different from the others, and has not been updated since 2013, so I'll get to it eventually.
+- Starfield (https://www.nexusmods.com/starfield/mods/106)
 
 Purpose:
 - Checks for latest file version against locally installed
@@ -42,7 +38,8 @@ Usage:
   - Checks game for Fallout 76 SFE, an overlay DLL for Text Chat, requires NexusMods API Key, and does not delete the extracted download
 
 For Vortex users, add a new tool to your managed game (you'll have to do this for each game)
-- Target: `powershell.exe`
+- Target: `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`
+  - Note: You must use the full path to the PowerShell executable, or Vortex will not present the Run option.  
 - Command Line: `-ExecutionPolicy Bypass -File SE-Downloader.ps1 -SEGame NVSE -RunGame`
 - Enable "Run in Shell"
 - Once added, I personally make this my primary launch option (three dots in the tool, dropdown menu "Make primary", should put a little flag on it)
