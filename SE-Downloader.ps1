@@ -42,7 +42,7 @@ Usage:
 #>
 
 param(
-    [Parameter(Mandatory)]
+    [Parameter()]
     [ValidateSet("FOSE","NVSE","F4SE","F76SFE","OBSE","SKSE","SKSE64","SKSEVR","MWSE","SFSE")]
     [string]$SEGame,
 
@@ -56,16 +56,15 @@ param(
     [string]$hardpath,
 
     [Parameter()]
-    [string]$nexusAPI # NexusMods API Key (https://www.nexusmods.com/users/myaccount?tab=api)
+    [string]$nexusAPI = (Get-Content "..\nexus.api") # NexusMods API Key (https://www.nexusmods.com/users/myaccount?tab=api)
 )
 
 # For Debug
-<#
-$SEGame = "SFSE"
-$RunGame = $false 
+
+#$SEGame = "SFSE"
+#$RunGame = $false 
 #$dlkeep = $true
-#>
-if ($null -eq $nexusAPI) { $nexusAPI = Get-Content ..\nexus.api }
+
 
 Function Get-GamePath {
 	# Get the Install Path from the uninstall registry
@@ -88,16 +87,26 @@ Function Get-NexusMods {
         "apikey"="$nexusAPI"
     }
     $global:url = "https://api.nexusmods.com"
-    $global:WebResponse = (Invoke-WebRequest "https://api.nexusmods.com/v1/games/$nexusgameID/mods/$nexusmodID/files.json" -Headers $nexusHeaders -UseBasicParsing).Content | ConvertFrom-Json | Select-Object -Property @{L='files';E={$_.files[$nexusfileindex]}}
-    $global:json = $WebResponse.files
-    $global:latestfileid = $json.file_id[0]
-    $global:dlResponse = (Invoke-WebRequest "https://api.nexusmods.com/v1/games/$nexusgameID/mods/$nexusmodID/files/$latestfileid/download_link.json" -Headers $nexusHeaders).Content | ConvertFrom-Json | Select-Object -Property @{L='URI';E={$_.URI[0]}}
-    $global:dl = [PSCustomObject]@{
-        ver = [System.Version]::Parse("0.$($json.version)")
-        url = $dlResponse.URI
-        file = $json.file_name
+    Try {
+        $global:WebResponse = (Invoke-WebRequest "https://api.nexusmods.com/v1/games/$nexusgameID/mods/$nexusmodID/files.json" -Headers $nexusHeaders -UseBasicParsing).Content | ConvertFrom-Json | Select-Object -Property @{L='files';E={$_.files[$nexusfileindex]}}
+        $global:json = $WebResponse.files
+        $global:latestfileid = $json.file_id[0]
+        $global:dlResponse = (Invoke-WebRequest "https://api.nexusmods.com/v1/games/$nexusgameID/mods/$nexusmodID/files/$latestfileid/download_link.json" -Headers $nexusHeaders).Content | ConvertFrom-Json | Select-Object -Property @{L='URI';E={$_.URI[0]}}
+        $global:dl = [PSCustomObject]@{
+            ver = [System.Version]::Parse("0.$($json.version)")
+            url = $dlResponse.URI
+            file = $json.file_name
+            nexusver = $json.version
+        }
+        $global:subfolder = ($dl.file).Replace('.7z','') # f4se_0_06_20
+    } Catch {
+        Write-Host "Unable to access NexusMods API"
+        Write-Host $Error[0].Exception.Message -ForegroundColor Red
+        Write-Host "API Key: $nexusAPI"
+        Write-Host "Game: $GameName"
+        Write-Host "Mod ID: $nexusmodID"
+        $global:halt = $true
     }
-    $global:subfolder = ($dl.file).Replace('.7z','') # f4se_0_06_20
 }
 
 function Write-Log { 
@@ -156,7 +165,8 @@ function Write-Log {
                 } 
             } 
         # Write log entry to $Path 
-        "$FormattedDate $LevelText $Message" | Out-File -FilePath $Path -Append 
+        "$FormattedDate $LevelText $Message" | Out-File -FilePath $Path -Append
+        Write-Host "$FormattedDate $LevelText $Message"
     }
 }
 
@@ -189,7 +199,7 @@ If ($SEGame -eq "SKSE64") {
     $subfolder = ($dl.file).Replace('.7z','') # f4se_0_06_20
 } ElseIf ($SEGame -eq "SKSEVR") {
     # TODO Need to validate
-    If ($nexusAPI = "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
+    If ($nexusAPI -eq "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
     $GameName = "Skyrim VR"
     $nexusmodID = "30457"
     $nexusgameID = "skyrimspecialedition"
@@ -197,7 +207,7 @@ If ($SEGame -eq "SKSE64") {
     Get-NexusMods
 } ElseIf ($SEGame -eq "SKSE") {
     # TODO Need to validate
-    If ($nexusAPI = "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
+    If ($nexusAPI -eq "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
     $GameName = "Skyrim"
     $nexusmodID = "100216"
     $nexusgameID = "skyrim"
@@ -229,7 +239,7 @@ If ($SEGame -eq "SKSE64") {
     }
     $subfolder = ($dl.file).Replace('.7z','') # f4se_0_06_20
 } ElseIf ($SEGame -eq "F76SFE") {
-    If ($nexusAPI = "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
+    If ($nexusAPI -eq "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
     $GameName = "Fallout76"
     $nexusgameID = "fallout76"
     $nexusmodID = "287"
@@ -277,7 +287,7 @@ If ($SEGame -eq "SKSE64") {
     $subfolder = ($dl.file).Replace('.7z','') # nvse_5_1_beta6
 } ElseIf ($SEGame -eq "MWSE") {
     # TODO Need to validate
-    If ($nexusAPI = "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
+    If ($nexusAPI -eq "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
     $GameName = "Morrowind"
     $nexusmodID = "45468"
     $nexusgameID = "morrowind"
@@ -285,96 +295,102 @@ If ($SEGame -eq "SKSE64") {
     Get-NexusMods
 } ElseIf ($SEGame -eq "SFSE") {
     # TODO Need to validate
-    If ($nexusAPI = "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
+    If ($nexusAPI -eq "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
     $GameName = "Starfield"
     $nexusmodID = "106"
     $nexusgameID = "starfield"
     $nexusfileindex = "-1"
     Get-NexusMods
+    $subfolder = "$($SEGame.ToLower())_$($dl.nexusver.Replace('.','_'))" 
 }
 
-If ($null -eq $gamepath) { Get-GamePath }
+If (!($halt)) {
+    If ($null -eq $gamepath) { Get-GamePath }
 
-#### If a silverlock.org url, use this section to build out version validation ####
-If ($url -match "silverlock.org") {
-    # Get the latest 7-Zip file
+    #### If a silverlock.org url, use this section to build out version validation ####
+    If ($url -match "silverlock.org") {
+        # Get the latest 7-Zip file
+        Try { 
+            $WebResponse = Invoke-WebRequest $url
+        } Catch {
+            Write-Log -Message "Unable to access URL: $url" -Level Error
+            Exit
+        }
+        $target = $WebResponse.Links | Where-Object {$_.href -Like "*$rtype/$($SEGame)_*.7z"}
+        $target = $target.href
+        If ($target -match $url) { $target = $target -Replace "$url","" }
+        If ($target -match "./$($rtype)*") { $target = $target.Replace('./','') }
+        $dlurl = $url + $target
+        $file = ($target).Replace("$($rtype)/","") # f4se_0_06_20.7z
+        $subfolder = ($file).Replace('.7z','') # f4se_0_06_20
+        # Get version info from file name
+        $SEGameString = $SEGame + '_'
+        $dlver = $subfolder.Replace($SEGameString.ToLower(),'') # 0_06_20
+        If ($SEGame -eq "SKSE64") { $dlver = $dlver.Replace('00','0') ; $dlver = "0." + $dlver } # SKSE64 currently reads as 2.00.17, fixes to 0.2.0.17
+        $dlver = $dlver.Replace('_','.') # 0.06.20
+        If (($SEGame -eq "FOSE") -or ($SEGame -eq "NVSE")) {
+            If ($dlver -match 'v') { $dlver = $dlver.Replace('v','')}
+            If ($dlver -match 'beta') { $dlver = $dlver -Replace '.beta\w','' }
+            If ($dlver.Count -lt 5 ) {$dlver = "0." + $dlver + ".0"}
+        } ElseIf ($dlver -notlike "*.*.*.*") {
+            $dlver = $dlver.Insert(3,'.') # 0.0.6.20
+        }
+        $dlver = [System.Version]::Parse($dlver)
+
+        $dl = [PSCustomObject]@{
+            ver = $dlver
+            url = $dlurl
+            file = $file
+        }
+    }
+
+    # Get current install version
     Try { 
-        $WebResponse = Invoke-WebRequest $url
+        If ($null -eq $currentSE) {
+            $currentSE = Get-Item "$gamepath\$($SEGame.ToLower())_*.dll" -Exclude "$($SEGame)_steam_loader.dll","$($SEGame.ToLower())_editor*.dll" # f4se_1_10_163.dll
+            $currentSE = (Get-Item $currentSE).VersionInfo.FileVersion # 0, 0, 6, 20
+            If ($currentSE -is [System.Array]) { $currentSE = $currentSE[0] }
+            $currentSE = $currentSE.Replace(', ','.') # 0.0.6.20
+            $currentSE = [System.Version]::Parse($currentSE)
+        }
     } Catch {
-        Write-Log -Message "Unable to access URL: $url" -Level Error
-        Exit
+        $currentSE = [System.Version]::Parse("0.0.0.0") # Means you don't have it
     }
-    $target = $WebResponse.Links | Where-Object {$_.href -Like "*$rtype/$($SEGame)_*.7z"}
-    $target = $target.href
-    If ($target -match $url) { $target = $target -Replace "$url","" }
-    If ($target -match "./$($rtype)*") { $target = $target.Replace('./','') }
-    $dlurl = $url + $target
-    $file = ($target).Replace("$($rtype)/","") # f4se_0_06_20.7z
-    $subfolder = ($file).Replace('.7z','') # f4se_0_06_20
-    # Get version info from file name
-    $SEGameString = $SEGame + '_'
-    $dlver = $subfolder.Replace($SEGameString.ToLower(),'') # 0_06_20
-    If ($SEGame -eq "SKSE64") { $dlver = $dlver.Replace('00','0') ; $dlver = "0." + $dlver } # SKSE64 currently reads as 2.00.17, fixes to 0.2.0.17
-    $dlver = $dlver.Replace('_','.') # 0.06.20
-    If (($SEGame -eq "FOSE") -or ($SEGame -eq "NVSE")) {
-        If ($dlver -match 'v') { $dlver = $dlver.Replace('v','')}
-        If ($dlver -match 'beta') { $dlver = $dlver -Replace '.beta\w','' }
-        If ($dlver.Count -lt 5 ) {$dlver = "0." + $dlver + ".0"}
-    } ElseIf ($dlver -notlike "*.*.*.*") {
-        $dlver = $dlver.Insert(3,'.') # 0.0.6.20
-    }
-    $dlver = [System.Version]::Parse($dlver)
-
-    $dl = [PSCustomObject]@{
-        ver = $dlver
-        url = $dlurl
-        file = $file
-    }
-}
-
-# Get current install version
-Try { 
-    If ($null -eq $currentSE) {
-        $currentSE = Get-Item "$gamepath\$($SEGame.ToLower())_*.dll" -Exclude "$($SEGame)_steam_loader.dll","$($SEGame.ToLower())_editor*.dll" # f4se_1_10_163.dll
-        $currentSE = (Get-Item $currentSE).VersionInfo.FileVersion # 0, 0, 6, 20
-        If ($currentSE -is [System.Array]) { $currentSE = $currentSE[0] }
-        $currentSE = $currentSE.Replace(', ','.') # 0.0.6.20
-        $currentSE = [System.Version]::Parse($currentSE)
-    }
-} Catch {
-    $currentSE = [System.Version]::Parse("0.0.0.0") # Means you don't have it
-}
-# Compare versions, download if source is newer
-If ($dl.ver -gt $currentSE) {
-    Write-Log -Message "Source version ($($dl.ver)) is higher than Local version ($currentSE)" -Level Warn
-    Write-Log -Message "Downloading Source version ($($dl.url))" -Level Info
-    Invoke-WebRequest $dl.url -OutFile "$env:USERPROFILE\Downloads\$($dl.file)"
-    # Cleanup Fallout 4 directory of older F4SE components
-    Write-Log -Message "Cleaning up older Local $($SEGame) files" -Level Info
-    Get-ChildItem -Path "$gamepath\$($SEGame)*" -Exclude "$SEGame-Updater.log" | Remove-Item -Force
-    # Extract F4SE to the Fallout 4 folder (f4path\f4se_x_xx_xx)
-    Write-Log -Message "Extracting Source $($SEGame) files ($($dl.file) to $($gamepath))" -Level Info
-    $file = $dl.file
-    If ($useSubfolder) {
-        & ${env:ProgramFiles}\7-Zip\7z.exe x $env:USERPROFILE\Downloads\$file "-o$($gamepath + "\" + $subfolder)" -y # The Silverlock files have a subdir in the 7z file, the NVSE/Nexus files do not. Use this flag to create that subdir structure.
+    # Compare versions, download if source is newer
+    If ($dl.ver -gt $currentSE) {
+        Write-Log -Message "Source version ($($dl.ver)) is higher than Local version ($currentSE)" -Level Warn
+        Write-Log -Message "Downloading Source version ($($dl.url))" -Level Info
+        Invoke-WebRequest $dl.url -OutFile "$env:USERPROFILE\Downloads\$($dl.file)"
+        # Cleanup Fallout 4 directory of older F4SE components
+        Write-Log -Message "Cleaning up older Local $($SEGame) files" -Level Info
+        Get-ChildItem -Path "$gamepath\$($SEGame)*" -Exclude "$SEGame-Updater.log" | Remove-Item -Force
+        # Extract F4SE to the Fallout 4 folder (f4path\f4se_x_xx_xx)
+        Write-Log -Message "Extracting Source $($SEGame) files ($($dl.file) to $($gamepath))" -Level Info
+        $file = $dl.file
+        If ($useSubfolder) {
+            & ${env:ProgramFiles}\7-Zip\7z.exe x $env:USERPROFILE\Downloads\$file "-o$($gamepath + "\" + $subfolder)" -y # The Silverlock files have a subdir in the 7z file, the NVSE/Nexus files do not. Use this flag to create that subdir structure.
+        } Else {
+            & ${env:ProgramFiles}\7-Zip\7z.exe x $env:USERPROFILE\Downloads\$file "-o$($gamepath)" -y
+        }
+        # Copy the required components of F4SE to the root Fallout 4 folder
+        Write-Log -Message "Copying Source $($SEGame) files to game path" -Level Info
+        Copy-Item "$gamepath\$subfolder\*" -Exclude *.txt -Destination $gamepath -Force
+        # Cleanup
+        If ($dlkeep -eq $false) {
+            Write-Log -Message "Cleaning up extracted files from $($gamepath)\$($subfolder)" -Level Info
+            If (Test-Path -Path "$gamepath\src") { Remove-Item -Path "$gamepath\src" -Recurse -Force }
+            Remove-Item -Path $gamepath\$subfolder -Recurse -Force
+        }
     } Else {
-        & ${env:ProgramFiles}\7-Zip\7z.exe x $env:USERPROFILE\Downloads\$file "-o$($gamepath)" -y
+        Write-Log -Message "Source version ($($dl.ver)) is NOT higher than Local version ($currentSE), no action taken" -Level Info
     }
-    # Copy the required components of F4SE to the root Fallout 4 folder
-    Write-Log -Message "Copying Source $($SEGame) files to game path" -Level Info
-    Copy-Item "$gamepath\$subfolder\*" -Exclude *.txt -Destination $gamepath -Force
-    # Cleanup
-    Write-Log -Message "Cleaning up extracted files from $($gamepath)\$($subfolder)" -Level Info
-    If ($dlkeep -eq $false) { Remove-Item -Path $gamepath\$subfolder -Recurse -Force }
-} Else {
-    Write-Log -Message "Source version ($($dl.ver)) is NOT higher than Local version ($currentSE), no action taken" -Level Info
-}
-If ($RunGame) {
-    If ($SEGame -eq "F76SFE") {
-        Write-Log -Message "RunGame flag True, running Fallout76.exe" -Level Info
-        Start-Process -FilePath "$gamepath\Fallout76.exe" -WorkingDirectory $gamepath -PassThru
-    } Else {
-        Write-Log -Message "RunGame flag True, running $($SEGame)_loader.exe" -Level Info
-        Start-Process -FilePath "$gamepath\$($SEGame)_loader.exe" -WorkingDirectory $gamepath -PassThru
+    If ($RunGame) {
+        If ($SEGame -eq "F76SFE") {
+            Write-Log -Message "RunGame flag True, running Fallout76.exe" -Level Info
+            Start-Process -FilePath "$gamepath\Fallout76.exe" -WorkingDirectory $gamepath -PassThru
+        } Else {
+            Write-Log -Message "RunGame flag True, running $($SEGame)_loader.exe" -Level Info
+            Start-Process -FilePath "$gamepath\$($SEGame)_loader.exe" -WorkingDirectory $gamepath -PassThru
+        }
     }
 }
