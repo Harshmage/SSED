@@ -109,6 +109,30 @@ Function Get-NexusMods {
     }
 }
 
+<#
+# For future use to move mod variables to an INI file
+Function Parse-IniFile ($file) {
+    $ini = @{}
+    # Create a default section if none exist in the file. Like a java prop file.
+    $section = "NO_SECTION"
+    $ini[$section] = @{}
+    switch -regex -file $file {
+        "^\[(.+)\]$" {
+            $section = $matches[1].Trim()
+            $ini[$section] = @{}
+        }
+        "^\s*([^#].+?)\s*=\s*(.*)" {
+            $name,$value = $matches[1..2]
+            # skip comments that start with semicolon:
+            if (!($name.StartsWith(";"))) {
+                $ini[$section][$name] = $value.Trim()
+            }
+        }
+    }
+    $ini
+}
+#>
+
 function Write-Log { 
     [CmdletBinding()] 
     Param ( 
@@ -244,6 +268,7 @@ If ($SEGame -eq "SKSE64") {
     $nexusgameID = "fallout76"
     $nexusmodID = "287"
     $nexusfileindex = "-1"
+    $url = "https://api.nexusmods.com"
     Get-NexusMods
     # And because SFE isn't exactly standard, we have to do some extra parsing.
 	Get-GamePath
@@ -301,7 +326,15 @@ If ($SEGame -eq "SKSE64") {
     $nexusgameID = "starfield"
     $nexusfileindex = "-1"
     Get-NexusMods
-    $subfolder = "$($SEGame.ToLower())_$($dl.nexusver.Replace('.','_'))" 
+    $subfolder = "$($SEGame.ToLower())_$($dl.nexusver.Replace('.','_'))"
+    # TODO Archive Invalidation
+    <#
+    C:\Users\<USER>\Documents\my games\Starfield
+    StarfieldCustom.ini
+    [Archive]
+    bInvalidateOlderFiles=1
+    sResourceDataDirsFinal=
+    #>
 }
 
 If (!($halt)) {
@@ -388,6 +421,20 @@ If (!($halt)) {
         If ($SEGame -eq "F76SFE") {
             Write-Log -Message "RunGame flag True, running Fallout76.exe" -Level Info
             Start-Process -FilePath "$gamepath\Fallout76.exe" -WorkingDirectory $gamepath -PassThru
+            # If a window named "SFE" is found, that means SFE is incompatible with the current game version, end the Fallout76.exe task tree, archive the dxgi.dll file, and relaunch Fallout76.exe.
+            Start-Sleep -Seconds 1
+            $sfe = Get-Process | Where-Object { $_.MainWindowTitle -eq "SFE" }
+            If ($sfe) {
+                Write-Log -Message "SFE is incompatible with the current game version, archiving dxgi.dll and relaunching Fallout76.exe" -Level Warn
+                Stop-Process -Name "Fallout76" -Force
+                # Rename dxgi.dll to SFE-<version>-dxgi.dll, if SFE-<version>-dxgi.dll exists, delete dxgi.dll
+                If (!(Test-Path "$gamepath\SFE-$($dl.ver)-dxgi.dll")) {
+                    Rename-Item -Path "$gamepath\dxgi.dll" -NewName "SFE-$($dl.ver)-dxgi.dll" -Force
+                } Else {
+                    Remove-Item -Path "$gamepath\dxgi.dll" -Force
+                }
+                Start-Process -FilePath "$gamepath\Fallout76.exe" -WorkingDirectory $gamepath -PassThru
+            }
         } Else {
             Write-Log -Message "RunGame flag True, running $($SEGame)_loader.exe" -Level Info
             Start-Process -FilePath "$gamepath\$($SEGame)_loader.exe" -WorkingDirectory $gamepath -PassThru
