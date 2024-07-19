@@ -61,7 +61,7 @@ param(
 
 # For Debug
 
-#$SEGame = "SFSE"
+#$SEGame = "F4SE"
 #$RunGame = $false 
 #$dlkeep = $true
 
@@ -252,16 +252,30 @@ If ($SEGame -eq "SKSE64") {
     $subfolder = ($dl.file).Replace('.7z','') # f4se_0_06_20
 } ElseIf ($SEGame -eq "F4SE") {
     $GameName = "Fallout4"
-    $url = "https://api.github.com/repos/ianpatt/$($SEGame)/releases"
-    $WebResponse = Invoke-WebRequest $url -Headers @{"Accept"="application/json"} -UseBasicParsing
-    $json = $WebResponse.Content | ConvertFrom-Json
-    $json = $json[0]
-    $dl = [PSCustomObject]@{
-        ver = [System.Version]::Parse("0." + ($json.tag_name).Replace("v","")) # 0. + 5.1.6 = 0.5.1.6
-        url = $json.assets.browser_download_url # https://github.com/xNVSE/NVSE/releases/download/5.1.6/nvse_5_1_beta6.7z
-        file = $json.assets.name # nvse_5_1_beta6.7z
+    # 20240718 - Adding new code to check the game version and determine the correct F4SE version to download due to the overhaul patch in April 2024
+    # This is going to be weird for a while, until ianpatt adds the 0.7.2 release to the Github repo (currently only available on NexusMods)
+    # Also this is in prep for Fallout: London, which will only work with the pre-overhaul patch version of Fallout 4
+    Get-GamePath
+    $currentGameVer = (Get-Item "$gamepath\Fallout4.exe").VersionInfo.FileVersion
+    if ($currentGameVer -eq "1.10.163.0") { # game version 1.10.163.0 is pre-overhaul patch, and uses F4SE 0.6.23
+        $url = "https://api.github.com/repos/ianpatt/$($SEGame)/releases"
+        $WebResponse = Invoke-WebRequest $url -Headers @{"Accept"="application/json"} -UseBasicParsing
+        $json = $WebResponse.Content | ConvertFrom-Json
+        $json = $json | Where-Object { $_.assets.name -eq "f4se_0_06_23.7z" }
+        $dl = [PSCustomObject]@{
+            ver = [System.Version]::Parse("0." + ($json.tag_name).Replace("v","")) # 0. + 5.1.6 = 0.5.1.6
+            url = $json.assets.browser_download_url # https://github.com/xNVSE/NVSE/releases/download/5.1.6/nvse_5_1_beta6.7z
+            file = $json.assets.name # nvse_5_1_beta6.7z
+        }
+        $subfolder = ($dl.file).Replace('.7z','') # f4se_0_06_20
+    } else { # otherwise assume the game is post-overhaul patch, and uses F4SE 0.7.2+ from NexusMods
+        If ($nexusAPI -eq "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
+        $nexusgameID = "fallout4"
+        $nexusmodID = "42147"
+        $nexusfileindex = "-1"
+        $url = "https://api.nexusmods.com"
+        Get-NexusMods
     }
-    $subfolder = ($dl.file).Replace('.7z','') # f4se_0_06_20
 } ElseIf ($SEGame -eq "F76SFE") {
     If ($nexusAPI -eq "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
     $GameName = "Fallout76"
