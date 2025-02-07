@@ -40,15 +40,13 @@ Usage:
   - Checks game for Fallout 3 with a direct install path
 - `se-downloader.ps1 -SEGame SKSE64`
   - Checks game for Skyrim Special Edition Script Extender
-- `se-downloader.ps1 -SEGame F76SFE -dlkeep -nexusAPI "NexusMods SSED API Key"`
+- `se-downloader.ps1 -SEGame F76SFE -dlkeep true -nexusAPI "NexusMods SSED API Key"`
   - Checks game for Fallout 76 SFE, an overlay DLL for Text Chat, requires NexusMods API Key, and does not delete the extracted download
 
 For Vortex users, add a new tool to your managed game (you'll have to do this for each game)
 - Target: `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`
-  - Note: You must use the full path to the PowerShell executable, or Vortex will not present the Run option.  
-- Target: `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`
-  - Note: You must use the full path to the PowerShell executable, or Vortex will not present the Run option.  
-- Command Line: `-ExecutionPolicy Bypass -File SE-Downloader.ps1 -SEGame NVSE -RunGame`
+  - Note: You must use the full path to the PowerShell executable, or Vortex will not present the Run option.
+- Command Line: `-File SE-Downloader.ps1 -SEGame NVSE -RunGame true`
 - Enable "Run in Shell"
 - Once added, I personally make this my primary launch option (three dots in the tool, dropdown menu "Make primary", should put a little flag on it)
 
