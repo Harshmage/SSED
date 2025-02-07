@@ -15,6 +15,7 @@ Currently supports:
     Oblivion (OBSE)
     Morrowind (MWSE)
     Starfield (SFSE)
+    Starfield (SFSE)
 
 Nexusmods API Reference: https://app.swaggerhub.com/apis-docs/NexusMods/nexus-mods_public_api_params_in_form_data/1.0#/
 Nexusmods API AUP: https://help.nexusmods.com/article/114-api-acceptable-use-policy
@@ -60,8 +61,13 @@ param(
 
     [Parameter()]
     [string]$nexusAPI = (Get-Content "..\nexus.api") # NexusMods API Key (https://www.nexusmods.com/users/myaccount?tab=api)
+    [string]$nexusAPI = (Get-Content "..\nexus.api") # NexusMods API Key (https://www.nexusmods.com/users/myaccount?tab=api)
 )
 
+# For Debug
+
+#$SEGame = "F4SE"
+#$RunGame = $false 
 # For Debug
 
 #$SEGame = "F4SE"
@@ -86,6 +92,58 @@ Function Get-GamePath {
 		}
 	}
 }
+
+Function Get-NexusMods {
+    $nexusHeaders = @{
+        "Accept"="application/json"
+        "apikey"="$nexusAPI"
+    }
+    $global:url = "https://api.nexusmods.com"
+    Try {
+        $global:WebResponse = (Invoke-WebRequest "https://api.nexusmods.com/v1/games/$nexusgameID/mods/$nexusmodID/files.json" -Headers $nexusHeaders -UseBasicParsing).Content | ConvertFrom-Json | Select-Object -Property @{L='files';E={$_.files[$nexusfileindex]}}
+        $global:json = $WebResponse.files
+        $global:latestfileid = $json.file_id[0]
+        $global:dlResponse = (Invoke-WebRequest "https://api.nexusmods.com/v1/games/$nexusgameID/mods/$nexusmodID/files/$latestfileid/download_link.json" -Headers $nexusHeaders).Content | ConvertFrom-Json | Select-Object -Property @{L='URI';E={$_.URI[0]}}
+        $global:dl = [PSCustomObject]@{
+            ver = [System.Version]::Parse("0.$($json.version)")
+            url = $dlResponse.URI
+            file = $json.file_name
+            nexusver = $json.version
+        }
+        $global:subfolder = ($dl.file).Replace('.7z','') # f4se_0_06_20
+    } Catch {
+        Write-Host "Unable to access NexusMods API"
+        Write-Host $Error[0].Exception.Message -ForegroundColor Red
+        Write-Host "API Key: $nexusAPI"
+        Write-Host "Game: $GameName"
+        Write-Host "Mod ID: $nexusmodID"
+        $global:halt = $true
+    }
+}
+
+<#
+# For future use to move mod variables to an INI file
+Function Parse-IniFile ($file) {
+    $ini = @{}
+    # Create a default section if none exist in the file. Like a java prop file.
+    $section = "NO_SECTION"
+    $ini[$section] = @{}
+    switch -regex -file $file {
+        "^\[(.+)\]$" {
+            $section = $matches[1].Trim()
+            $ini[$section] = @{}
+        }
+        "^\s*([^#].+?)\s*=\s*(.*)" {
+            $name,$value = $matches[1..2]
+            # skip comments that start with semicolon:
+            if (!($name.StartsWith(";"))) {
+                $ini[$section][$name] = $value.Trim()
+            }
+        }
+    }
+    $ini
+}
+#>
 
 Function Get-NexusMods {
     $nexusHeaders = @{
@@ -197,6 +255,8 @@ function Write-Log {
         # Write log entry to $Path 
         "$FormattedDate $LevelText $Message" | Out-File -FilePath $Path -Append
         Write-Host "$FormattedDate $LevelText $Message"
+        "$FormattedDate $LevelText $Message" | Out-File -FilePath $Path -Append
+        Write-Host "$FormattedDate $LevelText $Message"
     }
 }
 
@@ -210,6 +270,7 @@ If (!(Test-Path $env:ProgramFiles\7-Zip\7z.exe)) {
 # Set some variables
 $url = "https://$($SEGame).silverlock.org/"
 $rtype = "beta" # Release Type, Beta or Download
+
 
 
 # Build the primary game and DLL variables
@@ -230,17 +291,23 @@ If ($SEGame -eq "SKSE64") {
 } ElseIf ($SEGame -eq "SKSEVR") {
     # TODO Need to validate
     If ($nexusAPI -eq "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
+    If ($nexusAPI -eq "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
     $GameName = "Skyrim VR"
     $nexusmodID = "30457"
     $nexusgameID = "skyrimspecialedition"
     $nexusfileindex = "0"
     Get-NexusMods
+    $nexusfileindex = "0"
+    Get-NexusMods
 } ElseIf ($SEGame -eq "SKSE") {
     # TODO Need to validate
+    If ($nexusAPI -eq "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
     If ($nexusAPI -eq "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
     $GameName = "Skyrim"
     $nexusmodID = "100216"
     $nexusgameID = "skyrim"
+    $nexusfileindex = "0"
+    Get-NexusMods
     $nexusfileindex = "0"
     Get-NexusMods
 } ElseIf ($SEGame -eq "OBSE") {
@@ -282,13 +349,43 @@ If ($SEGame -eq "SKSE64") {
         $url = "https://api.nexusmods.com"
         Get-NexusMods
     }
+    # 20240718 - Adding new code to check the game version and determine the correct F4SE version to download due to the overhaul patch in April 2024
+    # This is going to be weird for a while, until ianpatt adds the 0.7.2 release to the Github repo (currently only available on NexusMods)
+    # Also this is in prep for Fallout: London, which will only work with the pre-overhaul patch version of Fallout 4
+    Get-GamePath
+    $currentGameVer = (Get-Item "$gamepath\Fallout4.exe").VersionInfo.FileVersion
+    if ($currentGameVer -eq "1.10.163.0") { # game version 1.10.163.0 is pre-overhaul patch, and uses F4SE 0.6.23
+        $url = "https://api.github.com/repos/ianpatt/$($SEGame)/releases"
+        $WebResponse = Invoke-WebRequest $url -Headers @{"Accept"="application/json"} -UseBasicParsing
+        $json = $WebResponse.Content | ConvertFrom-Json
+        $json = $json | Where-Object { $_.assets.name -eq "f4se_0_06_23.7z" }
+        $dl = [PSCustomObject]@{
+            ver = [System.Version]::Parse("0." + ($json.tag_name).Replace("v","")) # 0. + 5.1.6 = 0.5.1.6
+            url = $json.assets.browser_download_url # https://github.com/xNVSE/NVSE/releases/download/5.1.6/nvse_5_1_beta6.7z
+            file = $json.assets.name # nvse_5_1_beta6.7z
+        }
+        $subfolder = ($dl.file).Replace('.7z','') # f4se_0_06_20
+    } else { # otherwise assume the game is post-overhaul patch, and uses F4SE 0.7.2+ from NexusMods
+        If ($nexusAPI -eq "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
+        $nexusgameID = "fallout4"
+        $nexusmodID = "42147"
+        $nexusfileindex = "-1"
+        $url = "https://api.nexusmods.com"
+        Get-NexusMods
+    }
 } ElseIf ($SEGame -eq "F76SFE") {
+    If ($nexusAPI -eq "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
     If ($nexusAPI -eq "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
     $GameName = "Fallout76"
     $nexusgameID = "fallout76"
     $nexusmodID = "287"
     $nexusfileindex = "-1"
+    $nexusgameID = "fallout76"
+    $nexusmodID = "287"
+    $nexusfileindex = "-1"
     $url = "https://api.nexusmods.com"
+    Get-NexusMods
+    # And because SFE isn't exactly standard, we have to do some extra parsing.
     Get-NexusMods
     # And because SFE isn't exactly standard, we have to do some extra parsing.
 	Get-GamePath
@@ -306,6 +403,7 @@ If ($SEGame -eq "SKSE64") {
     # NVSE went to a community Github in May 2020
     # https://github.com/xNVSE/NVSE
     $url = "https://api.github.com/repos/xNVSE/$($SEGame)/releases"
+    $url = "https://api.github.com/repos/xNVSE/$($SEGame)/releases"
     $WebResponse = Invoke-WebRequest $url -Headers @{"Accept"="application/json"}
     $json = $WebResponse.Content | ConvertFrom-Json
     $json = $json[0]
@@ -318,7 +416,18 @@ If ($SEGame -eq "SKSE64") {
     $useSubfolder = $true
 } ElseIf ($SEGame -eq "FOSE") {
     # https://www.nexusmods.com/fallout3/mods/8606
+    # https://www.nexusmods.com/fallout3/mods/8606
     $GameName = "Fallout 3"
+    $nexusgameID = "fallout3"
+    $nexusmodID = "8606"
+    $nexusfileindex = "-1"
+    Get-NexusMods
+    # FOSE in a post-GFWL has a tag of -newloader, need to trim that off to work properly.
+    $global:dl = [PSCustomObject]@{
+        ver = [System.Version]::Parse("0.$(($json.version).Replace('-newloader',''))")
+        url = $dlResponse.URI
+        file = $json.file_name
+    }
     $nexusgameID = "fallout3"
     $nexusmodID = "8606"
     $nexusfileindex = "-1"
@@ -333,9 +442,33 @@ If ($SEGame -eq "SKSE64") {
 } ElseIf ($SEGame -eq "MWSE") {
     # TODO Need to validate
     If ($nexusAPI -eq "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
+    If ($nexusAPI -eq "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
     $GameName = "Morrowind"
     $nexusmodID = "45468"
     $nexusgameID = "morrowind"
+    $nexusfileindex = "-1"
+    Get-NexusMods
+} ElseIf ($SEGame -eq "SFSE") {
+    # TODO Need to validate
+    If ($nexusAPI -eq "") { Write-Log -Level Error -Message "Nexus API Key is empty" ; Exit }
+    $GameName = "Starfield"
+    $nexusmodID = "106"
+    $nexusgameID = "starfield"
+    $nexusfileindex = "-1"
+    Get-NexusMods
+    $subfolder = "$($SEGame.ToLower())_$($dl.nexusver.Replace('.','_'))"
+    # TODO Archive Invalidation
+    <#
+    C:\Users\<USER>\Documents\my games\Starfield
+    StarfieldCustom.ini
+    [Archive]
+    bInvalidateOlderFiles=1
+    sResourceDataDirsFinal=
+    #>
+}
+
+If (!($halt)) {
+    If ($null -eq $gamepath) { Get-GamePath }
     $nexusfileindex = "-1"
     Get-NexusMods
 } ElseIf ($SEGame -eq "SFSE") {
@@ -389,7 +522,42 @@ If (!($halt)) {
             $dlver = $dlver.Insert(3,'.') # 0.0.6.20
         }
         $dlver = [System.Version]::Parse($dlver)
+    #### If a silverlock.org url, use this section to build out version validation ####
+    If ($url -match "silverlock.org") {
+        # Get the latest 7-Zip file
+        Try { 
+            $WebResponse = Invoke-WebRequest $url
+        } Catch {
+            Write-Log -Message "Unable to access URL: $url" -Level Error
+            Exit
+        }
+        $target = $WebResponse.Links | Where-Object {$_.href -Like "*$rtype/$($SEGame)_*.7z"}
+        $target = $target.href
+        If ($target -match $url) { $target = $target -Replace "$url","" }
+        If ($target -match "./$($rtype)*") { $target = $target.Replace('./','') }
+        $dlurl = $url + $target
+        $file = ($target).Replace("$($rtype)/","") # f4se_0_06_20.7z
+        $subfolder = ($file).Replace('.7z','') # f4se_0_06_20
+        # Get version info from file name
+        $SEGameString = $SEGame + '_'
+        $dlver = $subfolder.Replace($SEGameString.ToLower(),'') # 0_06_20
+        If ($SEGame -eq "SKSE64") { $dlver = $dlver.Replace('00','0') ; $dlver = "0." + $dlver } # SKSE64 currently reads as 2.00.17, fixes to 0.2.0.17
+        $dlver = $dlver.Replace('_','.') # 0.06.20
+        If (($SEGame -eq "FOSE") -or ($SEGame -eq "NVSE")) {
+            If ($dlver -match 'v') { $dlver = $dlver.Replace('v','')}
+            If ($dlver -match 'beta') { $dlver = $dlver -Replace '.beta\w','' }
+            If ($dlver.Count -lt 5 ) {$dlver = "0." + $dlver + ".0"}
+        } ElseIf ($dlver -notlike "*.*.*.*") {
+            $dlver = $dlver.Insert(3,'.') # 0.0.6.20
+        }
+        $dlver = [System.Version]::Parse($dlver)
 
+        $dl = [PSCustomObject]@{
+            ver = $dlver
+            url = $dlurl
+            file = $file
+        }
+    }
         $dl = [PSCustomObject]@{
             ver = $dlver
             url = $dlurl

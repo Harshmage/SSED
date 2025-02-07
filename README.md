@@ -17,6 +17,7 @@ Currently supports:
 - Oblivion (https://github.com/llde/xOBSE)
 - Morrowind (https://www.nexusmods.com/morrowind/mods/45468)
 - Starfield (https://www.nexusmods.com/starfield/mods/106)
+- Starfield (https://www.nexusmods.com/starfield/mods/106)
 
 Purpose:
 - Checks for latest file version against locally installed
@@ -43,6 +44,8 @@ Usage:
   - Checks game for Fallout 76 SFE, an overlay DLL for Text Chat, requires NexusMods API Key, and does not delete the extracted download
 
 For Vortex users, add a new tool to your managed game (you'll have to do this for each game)
+- Target: `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`
+  - Note: You must use the full path to the PowerShell executable, or Vortex will not present the Run option.  
 - Target: `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`
   - Note: You must use the full path to the PowerShell executable, or Vortex will not present the Run option.  
 - Command Line: `-ExecutionPolicy Bypass -File SE-Downloader.ps1 -SEGame NVSE -RunGame`
