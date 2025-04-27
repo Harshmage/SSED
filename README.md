@@ -15,6 +15,7 @@ Currently supports:
 - Skyrim Original Edition (https://www.nexusmods.com/skyrim/mods/100216)
 - Skyrim VR (https://www.nexusmods.com/skyrimspecialedition/mods/30457)
 - Oblivion (https://github.com/llde/xOBSE)
+- Oblivion Remastered (http://nexusmods.com/oblivionremastered/mods/282)
 - Morrowind (https://www.nexusmods.com/morrowind/mods/45468)
 - Starfield (https://www.nexusmods.com/starfield/mods/106)
 - Starfield (https://www.nexusmods.com/starfield/mods/106)
